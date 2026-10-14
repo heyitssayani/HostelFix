@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HostelFix — Hostel Complaint Management System (React 18)</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Main Application Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- React 18 & ReactDOM 18 (Local Offline Libs with CDN Fallback) -->
+    <script src="lib/react.production.min.js"></script>
+    <script src="lib/react-dom.production.min.js"></script>
+    <script>
+      if (!window.React) {
+        document.write('<script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>');
+        document.write('<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>');
+      }
+    </script>
+
+    <!-- Babel Standalone for in-browser JSX compilation -->
+    <script src="lib/babel.min.js"></script>
+    <script>
+      if (!window.Babel) {
+        document.write('<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>');
+      }
+    </script>
+</head>
+<body>
+    <!-- React DOM Root Container -->
+    <div id="root">
+        <!-- Loading Placeholder before React mounts -->
+        <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0b0914; color: #b794f6; font-family: 'Plus Jakarta Sans', sans-serif;">
+            <div style="width: 48px; height: 48px; border: 3px solid rgba(183, 148, 246, 0.2); border-top-color: #c084fc; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <p style="margin-top: 1.25rem; font-weight: 700; font-size: 1.1rem; color: #f8fafc;">Launching Hostel<span style="color: #c084fc;">Fix</span> React App...</p>
+            <p style="margin-top: 0.25rem; font-size: 0.85rem; color: #94a3b8;">Loading modern dark-purple & lavender grievance portal</p>
+        </div>
+        <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+    </div>
+
+    <!-- Inline React 18 Application (Guarantees zero-CORS execution even when opened via file://) -->
+    <script type="text/babel">
+      const { useState, useEffect, useMemo } = React;
+
+      const STORAGE_KEY = "hostelfix_react_complaints_db";
+
+      const DEFAULT_COMPLAINTS = [
+        {
+          id: "HF-1001",
+          student_name: "Aarav Sharma",
+          room_number: "B-204",
+          title: "Ceiling fan regulator stuck at maximum speed",
+          category: "Electrical",
+          priority: "Medium",
+          description: "The fan regulator knob broke off and is jammed at speed 5. It creates excessive noise and cannot be slowed down or switched off independently.",
+          status: "In Progress",
+          created_at: "2026-10-10 14:30"
+        },
+        {
+          id: "HF-1002",
+          student_name: "Rohan Deshmukh",
+          room_number: "A-108",
+          title: "Continuous tap leakage under washbasin",
+          category: "Plumbing",
+          priority: "Urgent",
+          description: "Water pipe joint beneath the bathroom washbasin is dripping steadily, accumulating water on the floor and making it slippery.",
+          status: "Pending",
+          created_at: "2026-10-11 09:15"
+        },
+        {
+          id: "HF-1003",
+          student_name: "Priya Nair",
+          room_number: "C-312",
+          title: "Wi-Fi access point dead in 3rd floor west wing",
+          category: "Wi-Fi & Network",
+          priority: "High",
+          description: "The corridor router has no power or blinking lights. Students in rooms C-310 through C-316 have zero signal during evening study hours.",
+          status: "Resolved",
+          created_at: "2026-10-09 18:45"
+        },
+        {
+          id: "HF-1004",
+          student_name: "Karthik Verma",
+          room_number: "B-115",
+          title: "Study table drawer runner jammed",
+          category: "Carpentry",
+          priority: "Low",
+          description: "Wooden slider on the left drawer is misaligned and stuck halfway. Cannot store books or laptop safely.",
+          status: "Pending",
+          created_at: "2026-10-12 11:20"
+        },
+        {
+          id: "HF-1005",
+          student_name: "Siddharth Rao",
+          room_number: "A-304",
+          title: "Common corridor lighting tube flickering violently",
+          category: "Electrical",
+          priority: "Medium",
+          description: "Tube light right outside room A-304 flickers rapidly and produces a loud hum, causing headaches and poor visibility at night.",
+          status: "In Progress",
+          created_at: "2026-10-12 16:10"
+        },
+        {
+          id: "HF-1006",
+          student_name: "Ananya Sen",
+          room_number: "C-102",
+          title: "Room door latch lock cylinder jamming",
+          category: "Carpentry",
+          priority: "Urgent",
+          description: "Key gets stuck inside the lock tumbler when attempting to latch from outside. Need lock replacement for safety.",
+          status: "Resolved",
+          created_at: "2026-10-08 10:05"
+        }
+      ];
+
+      const CATEGORIES = ["Electrical", "Plumbing", "Carpentry", "Wi-Fi & Network", "Cleanliness", "Others"];
+      const PRIORITIES = ["Urgent", "High", "Medium", "Low"];
+      const STATUSES = ["Pending", "In Progress", "Resolved"];
+
+      function generateNextId(complaints) {
+        let maxNum = 1000;
+        complaints.forEach((c) => {
+          if (c.id && c.id.startsWith("HF-")) {
+            const num = parseInt(c.id.split("-")[1], 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+          }
+        });
+        return `HF-${maxNum + 1}`;
+      }
+
+      function getCurrentTimestamp() {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        const hh = String(now.getHours()).padStart(2, "0");
+        const min = String(now.getMinutes()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+      }
+
+      function App() {
+        const [complaints, setComplaints] = useState(() => {
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            return saved ? JSON.parse(saved) : DEFAULT_COMPLAINTS;
+          } catch (e) {
+            return DEFAULT_COMPLAINTS;
+          }
+        });
+
+        const [activeTab, setActiveTab] = useState("dashboard");
+        const [searchQuery, setSearchQuery] = useState("");
+        const [filterStatus, setFilterStatus] = useState("");
+        const [filterPriority, setFilterPriority] = useState("");
+        const [filterCategory, setFilterCategory] = useState("");
+        const [sortBy, setSortBy] = useState("newest");
+        const [deleteTarget, setDeleteTarget] = useState(null);
+        const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+        const [toasts, setToasts] = useState([]);
+        const [dataDropdownOpen, setDataDropdownOpen] = useState(false);
+
+        useEffect(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(complaints));
+          } catch (e) {}
+        }, [complaints]);
+
+        const addToast = (message, type = "success") => {
+          const id = Date.now() + Math.random();
+          setToasts((prev) => [...prev, { id, message, type }]);
+          setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+          }, 4000);
+        };
+
+        const removeToast = (id) => {
+          setToasts((prev) => prev.filter((t) => t.id !== id));
+        };
+
+        const handleAddComplaint = (newRecord) => {
+          const id = generateNextId(complaints);
+          const timestamp = getCurrentTimestamp();
+          const createdComplaint = {
+            id,
+            ...newRecord,
+            status: "Pending",
+            created_at: timestamp
+          };
+
+          setComplaints([createdComplaint, ...complaints]);
+          addToast(`Complaint ${id} lodged successfully! Status set to Pending.`, "success");
+          setActiveTab("complaints");
+        };
+
+        const handleStatusChange = (id, newStatus) => {
+          setComplaints((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+          );
+          addToast(`Updated status of ${id} to "${newStatus}".`, "success");
+        };
+
+        const handleConfirmDelete = () => {
+          if (!deleteTarget) return;
+          setComplaints((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+          addToast(`Deleted complaint ${deleteTarget.id}.`, "info");
+          setDeleteTarget(null);
+        };
+
+        const handleExportJson = () => {
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(complaints, null, 2));
+          const dlAnchor = document.createElement("a");
+          dlAnchor.setAttribute("href", dataStr);
+          dlAnchor.setAttribute("download", "complaints.json");
+          document.body.appendChild(dlAnchor);
+          dlAnchor.click();
+          dlAnchor.remove();
+          setDataDropdownOpen(false);
+          addToast("Downloaded complaints.json to your machine!", "success");
+        };
+
+        const handleResetSeed = () => {
+          if (window.confirm("Reset all complaints back to the original sample dataset? All custom items will be lost.")) {
+            setComplaints(DEFAULT_COMPLAINTS);
+            setDataDropdownOpen(false);
+            addToast("Reset dataset to original 6 sample complaints.", "info");
+          }
+        };
+
+        const metrics = useMemo(() => {
+          const total = complaints.length;
+          const pending = complaints.filter((c) => c.status === "Pending").length;
+          const inProgress = complaints.filter((c) => c.status === "In Progress").length;
+          const resolved = complaints.filter((c) => c.status === "Resolved").length;
+          const rate = total > 0 ? ((resolved / total) * 100).toFixed(1) : "0.0";
+
+          const byCategory = {};
+          CATEGORIES.forEach((cat) => {
+            byCategory[cat] = complaints.filter((c) => c.category === cat).length;
+          });
+
+          return { total, pending, inProgress, resolved, rate, byCategory };
+        }, [complaints]);
+
+        const filteredComplaints = useMemo(() => {
+          const query = searchQuery.trim().toLowerCase();
+          const priorityWeight = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+
+          return complaints
+            .filter((c) => {
+              if (query) {
+                const matchTitle = (c.title || "").toLowerCase().includes(query);
+                const matchId = (c.id || "").toLowerCase().includes(query);
+                const matchRoom = (c.room_number || "").toLowerCase().includes(query);
+                const matchStudent = (c.student_name || "").toLowerCase().includes(query);
+                if (!matchTitle && !matchId && !matchRoom && !matchStudent) return false;
+              }
+              if (filterStatus && c.status !== filterStatus) return false;
+              if (filterPriority && c.priority !== filterPriority) return false;
+              if (filterCategory && c.category !== filterCategory) return false;
+              return true;
+            })
+            .sort((a, b) => {
+              if (sortBy === "oldest") {
+                return (a.created_at || "").localeCompare(b.created_at || "");
+              }
+              if (sortBy === "priority") {
+                return (priorityWeight[a.priority] ?? 99) - (priorityWeight[b.priority] ?? 99);
+              }
+              return (b.created_at || "").localeCompare(a.created_at || "");
+            });
+        }, [complaints, searchQuery, filterStatus, filterPriority, filterCategory, sortBy]);
+
+        return (
+          <div className="react-app-root">
+            <header className="navbar">
+              <div className="nav-container">
+                <div className="nav-brand" onClick={() => setActiveTab("dashboard")}>
+                  <span className="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                  </span>
+                  <div className="brand-text">
+                    <span className="brand-title">Hostel<span className="brand-highlight">Fix</span></span>
+                    <span className="brand-subtitle">React Grievance Portal</span>
+                  </div>
+                </div>
+
+                <button
+                  className="nav-toggle"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  aria-label="Toggle navigation menu"
+                >
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </button>
+
+                <nav className={`nav-menu ${mobileMenuOpen ? "open" : ""}`}>
+                  <button
+                    className={`nav-tab-btn ${activeTab === "dashboard" ? "active" : ""}`}
+                    onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Dashboard
+                  </button>
+
+                  <button
+                    className={`nav-tab-btn ${activeTab === "complaints" ? "active" : ""}`}
+                    onClick={() => { setActiveTab("complaints"); setMobileMenuOpen(false); }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                    All Complaints
+                    <span className="nav-counter-pill">{complaints.length}</span>
+                  </button>
+
+                  <button
+                    className="nav-btn-cta"
+                    onClick={() => { setActiveTab("submit"); setMobileMenuOpen(false); }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="16"></line>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    + Submit Complaint
+                  </button>
+
+                  <button
+                    className="nav-icon-btn"
+                    title="Data Backup & Reset"
+                    onClick={() => setDataDropdownOpen(!dataDropdownOpen)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </header>
+
+            {dataDropdownOpen && (
+              <div className="data-dropdown" onClick={(e) => e.stopPropagation()}>
+                <button className="dropdown-item" onClick={handleExportJson}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Export complaints.json
+                </button>
+                <button className="dropdown-item text-danger" onClick={handleResetSeed}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <polyline points="23 20 23 14 17 14"></polyline>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                  </svg>
+                  Reset to Sample Data
+                </button>
+              </div>
+            )}
+
+            <div className="toast-container">
+              {toasts.map((toast) => (
+                <div key={toast.id} className={`toast toast-${toast.type}`}>
+                  <span className="toast-text">{toast.message}</span>
+                  <button className="toast-close" onClick={() => removeToast(toast.id)}>&times;</button>
+                </div>
+              ))}
+            </div>
+
+            <main className="main-content">
+              {activeTab === "dashboard" && (
+                <DashboardView
+                  metrics={metrics}
+                  complaints={complaints}
+                  onNavigate={(tab, catFilter) => {
+                    if (catFilter) setFilterCategory(catFilter);
+                    setActiveTab(tab);
+                  }}
+                  onStatusChange={handleStatusChange}
+                />
+              )}
+
+              {activeTab === "complaints" && (
+                <ComplaintsRegistryView
+                  complaints={filteredComplaints}
+                  totalCount={complaints.length}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  filterStatus={filterStatus}
+                  setFilterStatus={setFilterStatus}
+                  filterPriority={filterPriority}
+                  setFilterPriority={setFilterPriority}
+                  filterCategory={filterCategory}
+                  setFilterCategory={setFilterCategory}
+                  sortBy={sortBy}
+                  setSortBy={setSortBy}
+                  onStatusChange={handleStatusChange}
+                  onRequestDelete={(complaint) => setDeleteTarget(complaint)}
+                  onNavigateTab={setActiveTab}
+                />
+              )}
+
+              {activeTab === "submit" && (
+                <SubmitComplaintView
+                  onSubmit={handleAddComplaint}
+                  onCancel={() => setActiveTab("complaints")}
+                />
+              )}
+            </main>
+
+            {deleteTarget && (
+              <DeleteModal
+                complaint={deleteTarget}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setDeleteTarget(null)}
+              />
+            )}
+
+            <footer className="app-footer">
+              <div className="footer-container">
+                <div className="footer-col">
+                  <h4>Hostel<span className="brand-highlight">Fix</span></h4>
+                  <p>A reliable, paperless complaint resolution tracker for college hostels. Built with React 18 & LocalStorage.</p>
+                </div>
+                <div className="footer-col">
+                  <h4>Quick Navigation</h4>
+                  <ul className="footer-links">
+                    <li><button className="footer-nav-link" onClick={() => setActiveTab("dashboard")}>Dashboard</button></li>
+                    <li><button className="footer-nav-link" onClick={() => setActiveTab("complaints")}>Complaint Registry</button></li>
+                    <li><button className="footer-nav-link" onClick={() => setActiveTab("submit")}>Register New Issue</button></li>
+                  </ul>
+                </div>
+                <div className="footer-col">
+                  <h4>Status Flow</h4>
+                  <div className="status-legend">
+                    <span className="badge badge-pending">Pending</span> &rarr;
+                    <span className="badge badge-progress">In Progress</span> &rarr;
+                    <span className="badge badge-resolved">Resolved</span>
+                  </div>
+                  <p className="footer-storage-note">&bull; Data safely persisted in browser <code>localStorage</code> (React State)</p>
+                </div>
+              </div>
+              <div className="footer-bottom">
+                <p>&copy; 2026 HostelFix Portal. Single-Page React Web Application.</p>
+              </div>
+            </footer>
+          </div>
+        );
+      }
+
+      function DashboardView({ metrics, complaints, onNavigate, onStatusChange }) {
+        const recentComplaints = complaints.slice(0, 5);
+
+        return (
+          <div className="page-container">
+            <div className="dashboard-hero">
+              <div className="hero-content">
+                <span className="hero-pill">Hostel Maintenance Portal</span>
+                <h1>Hostel Complaint Dashboard</h1>
+                <p>Track, prioritize, and monitor the live resolution status of room issues across all hostel blocks.</p>
+              </div>
+              <div className="hero-action">
+                <button className="btn btn-primary btn-large" onClick={() => onNavigate("submit")}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                  </svg>
+                  Log New Complaint
+                </button>
+              </div>
+            </div>
+
+            <div className="metrics-grid">
+              <div className="metric-card card-total">
+                <div className="metric-header">
+                  <span className="metric-label">Total Logged</span>
+                  <span className="metric-icon icon-total">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <div className="metric-value">{metrics.total}</div>
+                <div className="metric-subtext">All registered grievances</div>
+              </div>
+
+              <div className="metric-card card-pending">
+                <div className="metric-header">
+                  <span className="metric-label">Pending Review</span>
+                  <span className="metric-icon icon-pending">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <div className="metric-value">{metrics.pending}</div>
+                <div className="metric-subtext">Awaiting technician assignment</div>
+              </div>
+
+              <div className="metric-card card-progress">
+                <div className="metric-header">
+                  <span className="metric-label">In Progress</span>
+                  <span className="metric-icon icon-progress">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <div className="metric-value">{metrics.inProgress}</div>
+                <div className="metric-subtext">Currently being repaired</div>
+              </div>
+
+              <div className="metric-card card-resolved">
+                <div className="metric-header">
+                  <span className="metric-label">Resolved</span>
+                  <span className="metric-icon icon-resolved">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <div className="metric-value">{metrics.resolved}</div>
+                <div className="metric-subtext">Successfully fixed & verified</div>
+              </div>
+            </div>
+
+            <div className="dashboard-details-row">
+              <div className="detail-card resolution-card">
+                <div className="detail-card-header">
+                  <h3>Resolution Progress</h3>
+                  <span className="rate-badge">{metrics.rate}% Completed</span>
+                </div>
+                <p className="detail-card-desc">Proportion of lodged complaints that have reached full resolution.</p>
+                <div className="progress-bar-container">
+                  <div className="progress-bar-fill" style={{ width: `${metrics.rate}%` }}></div>
+                </div>
+                <div className="resolution-breakdown">
+                  <div className="res-item">
+                    <span className="res-dot dot-resolved"></span>
+                    <span>Resolved: <strong>{metrics.resolved}</strong></span>
+                  </div>
+                  <div className="res-item">
+                    <span className="res-dot dot-progress"></span>
+                    <span>In Progress: <strong>{metrics.inProgress}</strong></span>
+                  </div>
+                  <div className="res-item">
+                    <span className="res-dot dot-pending"></span>
+                    <span>Pending: <strong>{metrics.pending}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="detail-card categories-card">
+                <div className="detail-card-header">
+                  <h3>Complaints by Category</h3>
+                  <button className="view-all-link" onClick={() => onNavigate("complaints")}>Browse All &rarr;</button>
+                </div>
+                <div className="category-pills-grid">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      className="category-stat-pill"
+                      onClick={() => onNavigate("complaints", cat)}
+                    >
+                      <span className="pill-name">{cat}</span>
+                      <span className="pill-count">{metrics.byCategory[cat] || 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="recent-complaints-section">
+              <div className="section-header">
+                <div>
+                  <h2>Recent Complaints</h2>
+                  <p className="section-subtext">Latest maintenance requests logged by hostel residents.</p>
+                </div>
+                <button className="btn btn-secondary" onClick={() => onNavigate("complaints")}>
+                  View All Complaints ({complaints.length})
+                </button>
+              </div>
+
+              <div className="complaints-table-wrapper">
+                <table className="complaints-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Student & Room</th>
+                      <th>Title & Category</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Date Logged</th>
+                      <th>Quick Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentComplaints.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: "center", padding: "2rem", color: "var(--text-dim)" }}>
+                          No complaints registered yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      recentComplaints.map((item) => (
+                        <tr key={item.id}>
+                          <td className="cell-id">
+                            <span className="complaint-id-tag">{item.id}</span>
+                          </td>
+                          <td>
+                            <div className="student-info">
+                              <span className="student-name">{item.student_name}</span>
+                              <span className="room-tag">Room {item.room_number}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="issue-info">
+                              <div className="issue-title">{item.title}</div>
+                              <span className="category-tag">{item.category}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`priority-badge priority-${item.priority.toLowerCase()}`}>
+                              {item.priority}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge badge-${item.status === "Pending" ? "pending" : item.status === "In Progress" ? "progress" : "resolved"}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="cell-date">{item.created_at}</td>
+                          <td>
+                            <select
+                              className="status-select-sm"
+                              value={item.status}
+                              onChange={(e) => onStatusChange(item.id, e.target.value)}
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Resolved">Resolved</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function ComplaintsRegistryView({
+        complaints,
+        totalCount,
+        searchQuery,
+        setSearchQuery,
+        filterStatus,
+        setFilterStatus,
+        filterPriority,
+        setFilterPriority,
+        filterCategory,
+        setFilterCategory,
+        sortBy,
+        setSortBy,
+        onStatusChange,
+        onRequestDelete,
+        onNavigateTab
+      }) {
+        const handleResetFilters = () => {
+          setSearchQuery("");
+          setFilterStatus("");
+          setFilterPriority("");
+          setFilterCategory("");
+          setSortBy("newest");
+        };
+
+        return (
+          <div className="page-container">
+            <div className="page-header">
+              <div>
+                <h1>Hostel Complaints Registry</h1>
+                <p className="section-subtext">Browse, search, filter, and update the resolution status of all reported issues.</p>
+              </div>
+              <button className="btn btn-primary" onClick={() => onNavigateTab("submit")}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="16"></line>
+                  <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                + Submit New Issue
+              </button>
+            </div>
+
+            <div className="filter-card">
+              <div className="filter-form">
+                <div className="search-input-group">
+                  <svg className="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by title, complaint ID (e.g. HF-1002), room, or student..."
+                    className="form-control search-control"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      onClick={() => setSearchQuery("")}
+                      aria-label="Clear Search"
+                    >
+                      &times;
+                    </button>
+                  )}
+                </div>
+
+                <div className="filters-row">
+                  <div className="filter-select-wrapper">
+                    <label className="filter-label">Status</label>
+                    <select
+                      className="form-control select-control"
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                      <option value="">All Statuses</option>
+                      {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="filter-select-wrapper">
+                    <label className="filter-label">Priority</label>
+                    <select
+                      className="form-control select-control"
+                      value={filterPriority}
+                      onChange={(e) => setFilterPriority(e.target.value)}
+                    >
+                      <option value="">All Priorities</option>
+                      {PRIORITIES.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="filter-select-wrapper">
+                    <label className="filter-label">Category</label>
+                    <select
+                      className="form-control select-control"
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                    >
+                      <option value="">All Categories</option>
+                      {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="filter-select-wrapper">
+                    <label className="filter-label">Sort By</label>
+                    <select
+                      className="form-control select-control"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                    >
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="priority">Highest Priority</option>
+                    </select>
+                  </div>
+
+                  <div className="filter-buttons">
+                    <button className="btn btn-outline btn-reset" onClick={handleResetFilters}>
+                      Reset Filters
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="results-header">
+              <span className="results-count">
+                Showing <strong>{complaints.length}</strong> of {totalCount} complaints
+              </span>
+              <div className="active-chips">
+                {searchQuery && (
+                  <span className="active-chip">
+                    Search: "{searchQuery}" <span onClick={() => setSearchQuery("")} style={{ cursor: "pointer", marginLeft: "4px" }}>&times;</span>
+                  </span>
+                )}
+                {filterStatus && (
+                  <span className="active-chip">
+                    Status: {filterStatus} <span onClick={() => setFilterStatus("")} style={{ cursor: "pointer", marginLeft: "4px" }}>&times;</span>
+                  </span>
+                )}
+                {filterPriority && (
+                  <span className="active-chip">
+                    Priority: {filterPriority} <span onClick={() => setFilterPriority("")} style={{ cursor: "pointer", marginLeft: "4px" }}>&times;</span>
+                  </span>
+                )}
+                {filterCategory && (
+                  <span className="active-chip">
+                    Category: {filterCategory} <span onClick={() => setFilterCategory("")} style={{ cursor: "pointer", marginLeft: "4px" }}>&times;</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {complaints.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🔍</div>
+                <h3>No matching complaints found</h3>
+                <p>No complaints matched your current search filters. Try clearing your query or resetting all filters.</p>
+                <div className="empty-actions">
+                  <button className="btn btn-secondary" onClick={handleResetFilters}>Clear All Filters</button>
+                  <button className="btn btn-primary" onClick={() => onNavigateTab("submit")}>+ Submit New Issue</button>
+                </div>
+              </div>
+            ) : (
+              <div className="complaint-cards-grid">
+                {complaints.map((item) => (
+                  <article key={item.id} className="complaint-item-card">
+                    <div className="card-top-row">
+                      <div className="id-and-category">
+                        <span className="complaint-id-tag">{item.id}</span>
+                        <span className="category-tag">{item.category}</span>
+                      </div>
+                      <div className="badges-group">
+                        <span className={`priority-badge priority-${item.priority.toLowerCase()}`}>
+                          {item.priority}
+                        </span>
+                        <span className={`badge badge-${item.status === "Pending" ? "pending" : item.status === "In Progress" ? "progress" : "resolved"}`}>
+                          {item.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h3 className="complaint-card-title">{item.title}</h3>
+                    <p className="complaint-card-description">{item.description}</p>
+
+                    <div className="complaint-meta-box">
+                      <div className="meta-item">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span>{item.student_name}</span>
+                      </div>
+                      <div className="meta-item">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        </svg>
+                        <span className="room-highlight">Room {item.room_number}</span>
+                      </div>
+                      <div className="meta-item">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>{item.created_at}</span>
+                      </div>
+                    </div>
+
+                    <div className="complaint-card-actions">
+                      <div className="status-change-form">
+                        <label className="status-change-label">Status:</label>
+                        <select
+                          className="form-control select-status-pill"
+                          value={item.status}
+                          onChange={(e) => onStatusChange(item.id, e.target.value)}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Resolved">Resolved</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-delete-icon"
+                        onClick={() => onRequestDelete(item)}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          <line x1="10" y1="11" line2="10" y2="17"></line>
+                          <line x1="14" y1="11" line2="14" y2="17"></line>
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      function SubmitComplaintView({ onSubmit, onCancel }) {
+        const [studentName, setStudentName] = useState("");
+        const [roomNumber, setRoomNumber] = useState("");
+        const [category, setCategory] = useState("");
+        const [priority, setPriority] = useState("");
+        const [title, setTitle] = useState("");
+        const [description, setDescription] = useState("");
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+
+          const nameTrim = studentName.trim();
+          const roomTrim = roomNumber.trim().toUpperCase();
+          const titleTrim = title.trim();
+          const descTrim = description.trim();
+
+          if (!nameTrim || nameTrim.length < 2) {
+            alert("Please provide a valid Student Name (at least 2 characters).");
+            return;
+          }
+          if (!roomTrim || roomTrim.length < 2) {
+            alert("Please provide a Room Number (e.g. B-204).");
+            return;
+          }
+          if (!category) {
+            alert("Please select a Category.");
+            return;
+          }
+          if (!priority) {
+            alert("Please select an Urgency Priority level.");
+            return;
+          }
+          if (!titleTrim || titleTrim.length < 5) {
+            alert("Please provide a Title with at least 5 characters.");
+            return;
+          }
+          if (!descTrim || descTrim.length < 10) {
+            alert("Please provide a Detailed Description of at least 10 characters.");
+            return;
+          }
+
+          onSubmit({
+            student_name: nameTrim,
+            room_number: roomTrim,
+            category,
+            priority,
+            title: titleTrim,
+            description: descTrim
+          });
+        };
+
+        return (
+          <div className="page-container">
+            <div className="form-page-layout">
+              <div className="form-main-card">
+                <div className="form-card-header">
+                  <span className="badge-accent">Hostel Maintenance Request</span>
+                  <h1>Submit a Room Complaint</h1>
+                  <p>Provide details about the issue in your hostel room or common corridor so the maintenance team can fix it quickly.</p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="submission-form" noValidate>
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label className="form-label">
+                        Student Name <span className="required-star">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. Aarav Sharma"
+                        value={studentName}
+                        onChange={(e) => setStudentName(e.target.value)}
+                        maxLength={50}
+                        required
+                      />
+                      <small className="form-help">Enter your registered hostel student name.</small>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">
+                        Room Number <span className="required-star">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. B-204 or A-Block 108"
+                        value={roomNumber}
+                        onChange={(e) => setRoomNumber(e.target.value)}
+                        maxLength={15}
+                        required
+                      />
+                      <small className="form-help">Include block and room number.</small>
+                    </div>
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label className="form-label">
+                        Category <span className="required-star">*</span>
+                      </label>
+                      <select
+                        className="form-control"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        required
+                      >
+                        <option value="" disabled>Select issue category...</option>
+                        {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
+                      <small className="form-help">Type of maintenance needed.</small>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">
+                        Priority Level <span className="required-star">*</span>
+                      </label>
+                      <select
+                        className="form-control"
+                        value={priority}
+                        onChange={(e) => setPriority(e.target.value)}
+                        required
+                      >
+                        <option value="" disabled>Select urgency level...</option>
+                        <option value="Urgent">Urgent (Immediate attention required)</option>
+                        <option value="High">High (Within 24 hours)</option>
+                        <option value="Medium">Medium (Within 2-3 days)</option>
+                        <option value="Low">Low (General maintenance)</option>
+                      </select>
+                      <small className="form-help">Choose based on safety and urgency.</small>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      Complaint Title / Summary <span className="required-star">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. Bathroom tap leaking constantly or ceiling fan regulator broken"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      maxLength={100}
+                      required
+                    />
+                    <small className="form-help">A concise one-line summary of the problem (5-100 characters).</small>
+                  </div>
+
+                  <div className="form-group">
+                    <div className="label-with-counter">
+                      <label className="form-label">
+                        Detailed Description <span className="required-star">*</span>
+                      </label>
+                      <span className="char-counter" style={{ color: description.length < 10 ? "#fc8181" : "var(--text-dim)" }}>
+                        {description.length} / 1000
+                      </span>
+                    </div>
+                    <textarea
+                      className="form-control textarea-control"
+                      rows={5}
+                      placeholder="Describe the issue in detail: exactly where it is located, when it started, and any symptoms..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      maxLength={1000}
+                      required
+                    />
+                    <small className="form-help">Provide clear details to help the technician arrive with the right tools.</small>
+                  </div>
+
+                  <div className="form-actions-bar">
+                    <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+                    <button type="submit" className="btn btn-primary btn-submit-complaint">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <line x1="22" y1="2" line2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                      Submit Complaint
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <aside className="form-sidebar">
+                <div className="sidebar-card">
+                  <div className="sidebar-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" line2="12" y2="12"></line>
+                      <line x1="12" y1="8" line2="12.01" y2="8"></line>
+                    </svg>
+                    <h3>Filing Tips</h3>
+                  </div>
+                  <ul className="tips-list">
+                    <li><strong>Be Specific:</strong> Mention whether it is the left tap, ceiling fan regulator, or study chair.</li>
+                    <li><strong>Safety First:</strong> For active electrical sparks or water overflow, mark priority as <em>Urgent</em> immediately.</li>
+                    <li><strong>One Issue per Ticket:</strong> Avoid grouping multiple unrelated issues in one ticket for faster resolution.</li>
+                  </ul>
+                </div>
+
+                <div className="sidebar-card">
+                  <div className="sidebar-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <h3>Resolution Flow</h3>
+                  </div>
+                  <div className="flow-steps">
+                    <div className="flow-step">
+                      <div className="step-num">1</div>
+                      <div className="step-text">
+                        <strong>Pending</strong>
+                        <p>Ticket is generated with a unique ID and added to the technician roster.</p>
+                      </div>
+                    </div>
+                    <div className="flow-step">
+                      <div className="step-num">2</div>
+                      <div className="step-text">
+                        <strong>In Progress</strong>
+                        <p>Assigned maintenance staff is inspecting or repairing the issue.</p>
+                      </div>
+                    </div>
+                    <div className="flow-step">
+                      <div className="step-num">3</div>
+                      <div className="step-text">
+                        <strong>Resolved</strong>
+                        <p>Work is completed and verified for your room.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        );
+      }
+
+      function DeleteModal({ complaint, onConfirm, onCancel }) {
+        return (
+          <div className="modal-backdrop" onClick={onCancel}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-alert-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" line2="12" y2="13"></line>
+                    <line x1="12" y1="17" line2="12.01" y2="17"></line>
+                  </svg>
+                </div>
+                <h3>Confirm Deletion</h3>
+              </div>
+              <p className="modal-body">
+                Are you sure you want to delete complaint <strong>{complaint.id}</strong>: <em>"{complaint.title}"</em>? This will permanently remove it from records.
+              </p>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+                <button className="btn btn-danger" onClick={onConfirm}>Yes, Delete</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      const rootElement = document.getElementById("root");
+      if (rootElement) {
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+      }
+    </script>
+</body>
+</html>
